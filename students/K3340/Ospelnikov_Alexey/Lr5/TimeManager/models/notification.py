@@ -12,6 +12,7 @@ class NotificationDefault(SQLModel):
     ))
     message: Optional[str] = ''
     is_read: bool = False
+    missed: Optional[bool] = True
 
 class Notification(NotificationDefault, table=True):
     id: int = Field(default=None, primary_key=True)

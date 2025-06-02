@@ -68,6 +68,14 @@
 <li>
     <a href="./" class="dropdown-item active" aria-current="page">Лабораторная работа 5</a>
 </li>
+                                    
+<li>
+    <a href="../lab_6/" class="dropdown-item">Лабораторная работа 6</a>
+</li>
+                                    
+<li>
+    <a href="../lab_7/" class="dropdown-item">Лабораторная работа 7</a>
+</li>
                                 </ul>
                             </li>
                         </ul>
@@ -84,7 +92,7 @@
                                 </a>
                             </li>
                             <li class="nav-item">
-                                <a rel="next" class="nav-link disabled">
+                                <a rel="next" href="../lab_6/" class="nav-link">
                                     Next <i class="fa fa-arrow-right"></i>
                                 </a>
                             </li>
@@ -106,9 +114,13 @@
     <div id="toc-collapse" class="navbar-collapse collapse card bg-body-tertiary">
         <ul class="nav flex-column">
             
-            <li class="nav-item" data-bs-level="1"><a href="#no1" class="nav-link">Лабораторная работа №1</a>
+            <li class="nav-item" data-bs-level="1"><a href="#no5" class="nav-link">Лабораторная работа №5</a>
               <ul class="nav flex-column">
             <li class="nav-item" data-bs-level="2"><a href="#_1" class="nav-link">Модели</a>
+              <ul class="nav flex-column">
+              </ul>
+            </li>
+            <li class="nav-item" data-bs-level="2"><a href="#_2" class="nav-link">Сервисы</a>
               <ul class="nav flex-column">
               </ul>
             </li>
@@ -119,7 +131,7 @@
 </div></div>
                     <div class="col-md-9" role="main">
 
-<h1 id="no1">Лабораторная работа №1</h1>
+<h1 id="no5">Лабораторная работа №5</h1>
 <h2 id="_1">Модели</h2>
 <p>Код модели User:</p>
 <pre><code class="language-python">class User(SQLModel, table=True):
@@ -214,6 +226,211 @@ class TaskScheduleSerializator(TaskScheduleDefault):
     schedules: Optional[&quot;Schedule&quot;] = None
 </code></pre>
 <p>Код модели Notification:</p>
+<pre><code class="language-python">class NotificationDefault(SQLModel):
+    created_at: Optional[datetime] = Field(sa_column=Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text(&quot;CURRENT_TIMESTAMP&quot;),
+    ))
+    message: Optional[str] = ''
+    is_read: bool = False
+
+class Notification(NotificationDefault, table=True):
+    id: int = Field(default=None, primary_key=True)
+    task: int = Field(default=None, foreign_key=&quot;task.id&quot;)
+    parent_task: Optional[Task] = Relationship(back_populates=&quot;notification_list&quot;)
+
+
+class NotificationTask(NotificationDefault):
+    parent_task: Optional[Task] = None
+</code></pre>
+<h2 id="_2">Сервисы</h2>
+<p>Код ceрвиса Notification:</p>
+<pre><code class="language-python">def new_notification_create(notification: Notification, session) -&gt; Notification:
+    session.add(notification)
+    session.commit()
+    session.refresh(notification)
+    return {&quot;status&quot;: 200, &quot;data&quot;: notification}
+
+
+def list_all_notifications(session) -&gt; List[Notification]:
+    return session.exec(select(Notification)).all()
+
+
+def get_notification_by_id(notification_id: int, session) -&gt; Notification:
+    data = session.exec(select(Notification).where(Notification.id == notification_id)).first()
+    if not data:
+        raise HTTPException(status_code=404, detail=&quot;Notification not found&quot;)    
+    return data
+
+def delete_notification(notification_id: int, session):
+    notification = session.get(Notification, notification_id)
+    if not notification:
+        raise HTTPException(status_code=404, detail=&quot;Notification not found&quot;)
+    session.delete(notification)
+    session.commit()
+    return {&quot;ok&quot;: True}    
+
+def patch_notification(notification_id: int, notification: Notification, session) -&gt; Notification:
+    db_notification = session.get(Notification, notification_id)
+    if not db_notification:
+        raise HTTPException(status_code=404, detail=&quot;Notification not found&quot;)
+    notification_data = notification.model_dump(exclude_unset=True)
+    for key, value in notification_data.items():
+        setattr(db_notification, key, value)
+    session.add(db_notification)
+    session.commit()
+    session.refresh(db_notification)
+    return db_notification
+</code></pre>
+<p>Код ceрвиса User:</p>
+<pre><code class="language-python">def new_user_create(user: User, session) -&gt; User:
+    hashed_password = get_password_hash(user.hash_password)
+    user = User(
+        email=user.email,
+        fullname=user.fullname,
+        hash_password=hashed_password 
+    )    
+    session.add(user) 
+    session.commit()
+    session.refresh(user)
+    return user
+
+
+def list_all_users(session) -&gt; List[User]:
+    return session.exec(select(User)).all()
+
+
+def get_user_by_id(user_id: int, session) -&gt; User:
+    user = session.exec(select(User).where(User.id == user_id)).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=&quot;User not found&quot;)    
+    return user
+
+def change_password(old_password: str,
+                new_password: str,
+                current_user: User, 
+                session
+                ) -&gt; User:
+    if verify_password(old_password, current_user.hash_password):
+        setattr(current_user, &quot;hash_password&quot;, get_password_hash(new_password))
+    session.add(current_user)
+    session.commit()
+    session.refresh(current_user)
+    return current_user
+
+def delete_user(user_id: int, session):
+    user = session.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail=&quot;User not found&quot;)
+    session.delete(user)
+    session.commit()
+    return {&quot;ok&quot;: True}    
+
+def patch_user(user_id: int, user: User, session) -&gt; User:
+    db_user = session.get(User, user_id)
+    if not db_user:
+        raise HTTPException(status_code=404, detail=&quot;User not found&quot;)
+    user_data = user.model_dump(exclude_unset=True)
+    for key, value in user_data.items():
+        setattr(db_user, key, value)
+    session.add(db_user)
+    session.commit()
+    session.refresh(db_user)
+    return db_user
+</code></pre>
+<p>Код ceрвиса Task_Schedule:</p>
+<pre><code class="language-python">def new_taskSchedule_create(taskSchedule: TaskSchedule, session) -&gt; TaskSchedule:
+    session.add(taskSchedule)
+    session.commit()
+    session.refresh(taskSchedule)
+    return {&quot;status&quot;: 200, &quot;data&quot;: taskSchedule}
+
+
+def get_taskSchedule_by_id(taskSchedule_id: int, session) -&gt; TaskSchedule:
+    taskSchedule = session.exec(select(TaskSchedule).where(TaskSchedule.id == taskSchedule_id)).first()
+    if not taskSchedule:
+        raise HTTPException(status_code=404, detail=&quot;TaskSchedule not found&quot;)    
+    return taskSchedule
+
+def delete_taskSchedule(taskSchedule_id: int, session):
+    taskSchedule = session.get(TaskSchedule, taskSchedule_id)
+    if not taskSchedule:
+        raise HTTPException(status_code=404, detail=&quot;TaskSchedule not found&quot;)
+    session.delete(taskSchedule)
+    session.commit()
+    return {&quot;ok&quot;: True}    
+
+def patch_taskSchedule(taskSchedule_id: int, taskSchedule: TaskSchedule, session) -&gt; TaskSchedule:
+    db_taskSchedule = session.get(TaskSchedule, taskSchedule_id)
+    if not db_taskSchedule:
+        raise HTTPException(status_code=404, detail=&quot;TaskSchedule not found&quot;)
+    taskSchedule_data = taskSchedule.model_dump(exclude_unset=True)
+    for key, value in taskSchedule_data.items():
+        setattr(db_taskSchedule, key, value)
+    session.add(db_taskSchedule)
+    session.commit()
+    session.refresh(db_taskSchedule)
+    return db_taskSchedule
+</code></pre>
+<p>Код ceрвиса Notification:</p>
+<pre><code class="language-python">class NotificationDefault(SQLModel):
+    created_at: Optional[datetime] = Field(sa_column=Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text(&quot;CURRENT_TIMESTAMP&quot;),
+    ))
+    message: Optional[str] = ''
+    is_read: bool = False
+
+class Notification(NotificationDefault, table=True):
+    id: int = Field(default=None, primary_key=True)
+    task: int = Field(default=None, foreign_key=&quot;task.id&quot;)
+    parent_task: Optional[Task] = Relationship(back_populates=&quot;notification_list&quot;)
+
+
+class NotificationTask(NotificationDefault):
+    parent_task: Optional[Task] = None
+</code></pre>
+<p>Код ceрвиса Notification:</p>
+<pre><code class="language-python">class NotificationDefault(SQLModel):
+    created_at: Optional[datetime] = Field(sa_column=Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text(&quot;CURRENT_TIMESTAMP&quot;),
+    ))
+    message: Optional[str] = ''
+    is_read: bool = False
+
+class Notification(NotificationDefault, table=True):
+    id: int = Field(default=None, primary_key=True)
+    task: int = Field(default=None, foreign_key=&quot;task.id&quot;)
+    parent_task: Optional[Task] = Relationship(back_populates=&quot;notification_list&quot;)
+
+
+class NotificationTask(NotificationDefault):
+    parent_task: Optional[Task] = None
+</code></pre>
+<p>Код ceрвиса Notification:</p>
+<pre><code class="language-python">class NotificationDefault(SQLModel):
+    created_at: Optional[datetime] = Field(sa_column=Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=text(&quot;CURRENT_TIMESTAMP&quot;),
+    ))
+    message: Optional[str] = ''
+    is_read: bool = False
+
+class Notification(NotificationDefault, table=True):
+    id: int = Field(default=None, primary_key=True)
+    task: int = Field(default=None, foreign_key=&quot;task.id&quot;)
+    parent_task: Optional[Task] = Relationship(back_populates=&quot;notification_list&quot;)
+
+
+class NotificationTask(NotificationDefault):
+    parent_task: Optional[Task] = None
+</code></pre>
+<p>Код ceрвиса Notification:</p>
 <pre><code class="language-python">class NotificationDefault(SQLModel):
     created_at: Optional[datetime] = Field(sa_column=Column(
         TIMESTAMP(timezone=True),

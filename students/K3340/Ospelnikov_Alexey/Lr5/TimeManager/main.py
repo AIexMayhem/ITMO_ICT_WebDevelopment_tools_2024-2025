@@ -12,6 +12,8 @@ from routers.ScheduleRouter import scheduleRouter
 from routers.NotificationRouter import notificationRouter
 from routers.NotificationRouter import notificationRouter
 from routers.AuthRouter import authRouter
+from routers.ParserRouter import parserRouter
+
 
 from connection import *
 from fastapi import FastAPI, Depends, HTTPException, status
@@ -30,6 +32,8 @@ app.include_router(taskScheduleRouter)
 app.include_router(taskRouter)
 app.include_router(scheduleRouter)
 app.include_router(notificationRouter)
+app.include_router(parserRouter)
+
 app.include_router(authRouter)
 
 

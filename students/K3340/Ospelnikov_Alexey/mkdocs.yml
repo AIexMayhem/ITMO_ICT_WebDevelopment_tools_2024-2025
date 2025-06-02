@@ -9,5 +9,7 @@ nav:
    - Лабораторная работа 4: labs/lab_4.md
    - Leetcode задачи: labs/Leetcode.md
    - Лабораторная работа 5: labs/lab_5.md
+   - Лабораторная работа 6: labs/lab_6.md
+   - Лабораторная работа 7: labs/lab_7.md
 theme:
  name: mkdocs
